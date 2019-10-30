@@ -8,10 +8,10 @@ import { Time } from "./time";
 import { TimeRange } from "./timerange";
 import { InterpolationType } from "./functions";
 import { AlignmentOptions, CollapseOptions, FillOptions, RateOptions, ReducerFunction, RenameColumnOptions, RollupOptions, SelectOptions, TimeSeriesOptions } from "./types";
-export interface TimeSeriesWireFormat {
+export interface TimeSeriesWireFormat<TData> {
     name?: string;
     tz?: string;
-    columns: string[];
+    columns: (keyof TData)[];
     points: any[];
     [propName: string]: any;
 }
@@ -27,8 +27,8 @@ export interface TimeSeriesEvents<T extends Key> {
     events?: Immutable.List<Event<T>>;
     [propName: string]: any;
 }
-export interface TimeSeriesListReducerOptions {
-    seriesList: Array<TimeSeries<Key>>;
+export interface TimeSeriesListReducerOptions<TData> {
+    seriesList: Array<TimeSeries<Key, TData>>;
     reducer?: (events: Immutable.List<Event<Key>>) => Immutable.List<Event<Key>>;
     fieldSpec?: string | string[];
     [propName: string]: any;
@@ -47,7 +47,7 @@ export interface TimeSeriesListReducerOptions {
  * }
  * ```
  */
-declare function timeSeries(arg: TimeSeriesWireFormat): TimeSeries<Time>;
+declare function timeSeries<TData>(arg: TimeSeriesWireFormat<TData>): TimeSeries<Time, TData>;
 /**
  * Create an `Index` based `TimeSeries` using the wire format
  * ```
@@ -62,7 +62,7 @@ declare function timeSeries(arg: TimeSeriesWireFormat): TimeSeries<Time>;
  * }
  * ```
  */
-declare function indexedSeries(arg: TimeSeriesWireFormat): TimeSeries<Index>;
+declare function indexedSeries<TData>(arg: TimeSeriesWireFormat<TData>): TimeSeries<Index, TData>;
 /**
  * Create a `Timerange` based `TimeSeries` using the wire format
  * ```
@@ -77,7 +77,7 @@ declare function indexedSeries(arg: TimeSeriesWireFormat): TimeSeries<Index>;
  * }
  * ```
  */
-declare function timeRangeSeries(arg: TimeSeriesWireFormat): TimeSeries<TimeRange>;
+declare function timeRangeSeries<TData>(arg: TimeSeriesWireFormat<TData>): TimeSeries<TimeRange, TData>;
 export { timeSeries, indexedSeries, timeRangeSeries };
 /**
  * A `TimeSeries<K>` represents a series of `Event<K>`'s, contained within a `Collection<K>`,
@@ -150,7 +150,7 @@ export { timeSeries, indexedSeries, timeRangeSeries };
  *    `TimeSeries` together
  *
  */
-export declare class TimeSeries<T extends Key> {
+export declare class TimeSeries<T extends Key, TData> {
     private _collection;
     private _data;
     /**
@@ -227,7 +227,7 @@ export declare class TimeSeries<T extends Key> {
      * });
      * ```
      */
-    constructor(arg: TimeSeries<T> | TimeSeriesEvents<T>);
+    constructor(arg: TimeSeries<T, TData> | TimeSeriesEvents<T>);
     /**
      * Turn the `TimeSeries` into regular javascript objects
      */
@@ -274,7 +274,7 @@ export declare class TimeSeries<T extends Key> {
      * Sets a new underlying collection for this `TimeSeries` and retuns a
      * new `TimeSeries`.
      */
-    setCollection<M extends Key>(collection: SortedCollection<M>): TimeSeries<M>;
+    setCollection<M extends Key>(collection: SortedCollection<M>): TimeSeries<M, TData>;
     /**
      * Returns the index that bisects the `TimeSeries` at the time specified.
      */
@@ -284,11 +284,11 @@ export declare class TimeSeries<T extends Key> {
      * `TimeSeries` representing a portion of this `TimeSeries` from
      * `begin` up to but not including `end`.
      */
-    slice(begin?: number, end?: number): TimeSeries<T>;
+    slice(begin?: number, end?: number): TimeSeries<T, TData>;
     /**
      * Crop the `TimeSeries` to the specified `TimeRange` and return a new `TimeSeries`.
      */
-    crop(tr: TimeRange): TimeSeries<T>;
+    crop(tr: TimeRange): TimeSeries<T, TData>;
     /**
      * Fetch the `TimeSeries` name
      */
@@ -296,7 +296,7 @@ export declare class TimeSeries<T extends Key> {
     /**
      * Rename the `TimeSeries`
      */
-    setName(name: string): TimeSeries<T>;
+    setName(name: string): TimeSeries<T, TData>;
     /**
      * Fetch the timeSeries `Index`, if it has one. This is still in the
      * API for historical reasons but is just a short cut to calling
@@ -345,7 +345,7 @@ export declare class TimeSeries<T extends Key> {
      * Set new meta data for the `TimeSeries` using a `key` and `value`.
      * The result will be a new `TimeSeries`.
      */
-    setMeta(key: any, value: any): TimeSeries<T>;
+    setMeta(key: any, value: any): TimeSeries<T, TData>;
     /**
      * Returns the number of events in this `TimeSeries`
      */
@@ -410,6 +410,7 @@ export declare class TimeSeries<T extends Key> {
      * const avg = series.avg("temperature"); // 5
      * ```
      */
+    avg(key: (data: TData) => number, filter?: any): number;
     avg(fieldPath?: string, filter?: any): number;
     /**
      * Aggregates the events down to their medium value
@@ -505,7 +506,7 @@ export declare class TimeSeries<T extends Key> {
      * });
      * ```
      */
-    map<M extends Key>(mapper: (event?: Event<T>, index?: number) => Event<M>): TimeSeries<M>;
+    map<M extends Key>(mapper: (event?: Event<T>, index?: number) => Event<M>): TimeSeries<M, TData>;
     /**
      * Flat map over the events in this `TimeSeries`.
      *
@@ -549,7 +550,7 @@ export declare class TimeSeries<T extends Key> {
      * // }
      * ```
      */
-    flatMap<M extends Key>(mapper: (event?: Event<T>, index?: number) => Immutable.List<Event<M>>): TimeSeries<M>;
+    flatMap<M extends Key>(mapper: (event?: Event<T>, index?: number) => Immutable.List<Event<M>>): TimeSeries<M, TData>;
     /**
      * Remap the keys of the underlying Events, but keep the data the same.
      *
@@ -572,7 +573,7 @@ export declare class TimeSeries<T extends Key> {
      * ```
      *
      */
-    mapKeys<U extends Key>(mapper: (key: T) => U): TimeSeries<U>;
+    mapKeys<U extends Key>(mapper: (key: T) => U): TimeSeries<U, TData>;
     /**
      * Filter the `TimeSeries`'s `Event`'s with the supplied function.
      *
@@ -584,7 +585,7 @@ export declare class TimeSeries<T extends Key> {
      * const filtered = series.filter(e => e.get("a") < 8)
      * ```
      */
-    filter(predicate: (event: Event<T>, index: number) => boolean): TimeSeries<T>;
+    filter(predicate: (event: Event<T>, index: number) => boolean): TimeSeries<T, TData>;
     /**
      * Select out specified columns from the `Event`s within this `TimeSeries`.
      *
@@ -617,7 +618,7 @@ export declare class TimeSeries<T extends Key> {
      * // returns a series with columns ["b", "c"] only, "a" is discarded.
      * ```
      */
-    select(options: SelectOptions): TimeSeries<T>;
+    select(options: SelectOptions): TimeSeries<T, TData>;
     /**
      * Collapse multiple columns of a `Collection` into a new column.
      *
@@ -667,7 +668,7 @@ export declare class TimeSeries<T extends Key> {
      * sums.at(2).get("v")  // 9
      * ```
      */
-    collapse(options: CollapseOptions): TimeSeries<T>;
+    collapse(options: CollapseOptions): TimeSeries<T, TData>;
     /**
      * Rename columns in the underlying events.
      *
@@ -685,7 +686,7 @@ export declare class TimeSeries<T extends Key> {
      * "top level" (ie: non-deep) columns. If you need more
      * extravagant renaming, roll your own using `TimeSeries.map()`.
      */
-    renameColumns(options: RenameColumnOptions): TimeSeries<Key>;
+    renameColumns(options: RenameColumnOptions): TimeSeries<Key, TData>;
     /**
      * Take the data in this `TimeSeries` and "fill" any missing or invalid
      * values. This could be setting `null` values to zero so mathematical
@@ -715,7 +716,7 @@ export declare class TimeSeries<T extends Key> {
      * });
      * ```
      */
-    fill(options: FillOptions): TimeSeries<T>;
+    fill(options: FillOptions): TimeSeries<T, TData>;
     /**
      * Align event values to regular time boundaries. The value at
      * the boundary is interpolated. Only the new interpolated
@@ -750,13 +751,13 @@ export declare class TimeSeries<T extends Key> {
      *
      * ```
      */
-    align(options: AlignmentOptions): TimeSeries<T>;
+    align(options: AlignmentOptions): TimeSeries<T, TData>;
     /**
      * Returns the derivative of the `TimeSeries` for the given columns. The result will
      * be per second. Optionally you can substitute in `null` values if the rate
      * is negative. This is useful when a negative rate would be considered invalid.
      */
-    rate(options: RateOptions): TimeSeries<TimeRange>;
+    rate(options: RateOptions): TimeSeries<TimeRange, TData>;
     /**
      * Builds a new `TimeSeries` by dividing events within the `TimeSeries`
      * across multiple fixed windows of size `windowSize`.
@@ -798,7 +799,7 @@ export declare class TimeSeries<T extends Key> {
      * ```
      *
      */
-    fixedWindowRollup(options: RollupOptions<T>): TimeSeries<Index>;
+    fixedWindowRollup(options: RollupOptions<T>): TimeSeries<Index, TData>;
     /**
      * Builds a new `TimeSeries` by dividing events into hours.
      *
@@ -810,7 +811,7 @@ export declare class TimeSeries<T extends Key> {
      * ```
      *
      */
-    hourlyRollup(options: RollupOptions<T>): TimeSeries<Index>;
+    hourlyRollup(options: RollupOptions<T>): TimeSeries<Index, TData>;
     /**
      * Builds a new `TimeSeries` by dividing events into days.
      *
@@ -822,7 +823,7 @@ export declare class TimeSeries<T extends Key> {
      * ```
      *
      */
-    dailyRollup(options: RollupOptions<T>): TimeSeries<Index>;
+    dailyRollup(options: RollupOptions<T>): TimeSeries<Index, TData>;
     /**
      * Builds a new `TimeSeries` by dividing events into months.
      *
@@ -852,7 +853,7 @@ export declare class TimeSeries<T extends Key> {
      * Internal function to build the `TimeSeries` rollup functions using
      * an aggregator Pipeline.
      */
-    _rollup(options: RollupOptions<T>): TimeSeries<Index>;
+    _rollup(options: RollupOptions<T>): TimeSeries<Index, TData>;
     /**
      * Builds multiple `Collection`s, each collects together
      * events within a window of size `windowSize`. Note that these
@@ -871,12 +872,12 @@ export declare class TimeSeries<T extends Key> {
      * Static function to compare two `TimeSeries` to each other. If the `TimeSeries`
      * are of the same instance as each other then equals will return true.
      */
-    static equal(series1: TimeSeries<Key>, series2: TimeSeries<Key>): boolean;
+    static equal<TData>(series1: TimeSeries<Key, TData>, series2: TimeSeries<Key, TData>): boolean;
     /**
      * Static function to compare two `TimeSeries` to each other. If the `TimeSeries`
      * are of the same value as each other then equals will return true.
      */
-    static is(series1: TimeSeries<Key>, series2: TimeSeries<Key>): boolean;
+    static is<TData>(series1: TimeSeries<Key, TData>, series2: TimeSeries<Key, TData>): boolean;
     /**
      * Reduces a list of `TimeSeries` objects using a reducer function. This works
      * by taking each event in each `TimeSeries` and collecting them together
@@ -901,7 +902,7 @@ export declare class TimeSeries<T extends Key> {
      * });
      * ```
      */
-    static timeSeriesListReduce<T extends Key>(options: TimeSeriesOptions): TimeSeries<T>;
+    static timeSeriesListReduce<T extends Key, TData>(options: TimeSeriesOptions): TimeSeries<T, TData>;
     /**
      * Takes a list of `TimeSeries` and merges them together to form a new
      * `TimeSeries`.
@@ -924,9 +925,9 @@ export declare class TimeSeries<T extends Key> {
      * });
      * ```
      */
-    static timeSeriesListMerge<T extends Key>(options: TimeSeriesOptions): TimeSeries<T>;
+    static timeSeriesListMerge<T extends Key, TData>(options: TimeSeriesOptions): TimeSeries<T, TData>;
     /**
      * @private
      */
-    static timeSeriesListEventReduce<T extends Key>(options: TimeSeriesListReducerOptions): TimeSeries<T>;
+    static timeSeriesListEventReduce<T extends Key, TData>(options: TimeSeriesListReducerOptions<TData>): TimeSeries<T, TData>;
 }
